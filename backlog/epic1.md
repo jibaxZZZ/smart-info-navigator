@@ -43,3 +43,11 @@ Acceptance Criteria
 	•	MCP responses include UI metadata
 	•	Tables, buttons, and status badges render correctly
 	•	UI degrades gracefully to text if rendering fails
+
+---
+
+Progress Notes (2026-01-03)
+- UI resource registered with `text/html+skybridge` and widget metadata (CSP, description, border preference).
+- Tool metadata includes `openai/outputTemplate` and invocation messaging for widget rendering.
+- Tool responses now keep structuredContent concise and pass full UI payload via `_meta` for widgets.
+

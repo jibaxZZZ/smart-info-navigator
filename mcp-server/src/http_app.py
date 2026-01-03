@@ -43,15 +43,25 @@ def _tool_meta(template_uri: str, invoking: str, invoked: str) -> dict[str, Any]
 
 
 def _tool_response(result: dict[str, Any], view: str) -> dict[str, Any]:
-    message = result.get("message") or "Request completed."
-    data = result.get("data")
+    message = result.get("message") or result.get("error") or "Request completed."
+    data = result.get("data") or {}
+    structured_content: dict[str, Any] = {
+        "success": result.get("success", False),
+        "message": message,
+        "view": view,
+    }
+
+    if "count" in data and isinstance(data["count"], int):
+        structured_content["count"] = data["count"]
+    elif isinstance(data, dict) and isinstance(data.get("tasks"), list):
+        structured_content["count"] = len(data["tasks"])
+    if isinstance(data, dict) and "id" in data:
+        structured_content["id"] = data["id"]
+    if not structured_content["success"] and "error" in result:
+        structured_content["error"] = result["error"]
+
     return {
-        "structuredContent": {
-            "success": result.get("success", False),
-            "message": message,
-            "data": data,
-            "ui": {"view": view},
-        },
+        "structuredContent": structured_content,
         "content": [{"type": "text", "text": message}],
         "_meta": {
             "ui": {"view": view, "payload": data},
@@ -61,6 +71,29 @@ def _tool_response(result: dict[str, Any], view: str) -> dict[str, Any]:
 
 
 UI_TEMPLATE_URI = "ui://widget/tasks.html"
+
+
+def _origin_from_base_url(base_url: str) -> str | None:
+    if not base_url:
+        return None
+    parsed = urlparse(base_url)
+    if not parsed.scheme or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _widget_meta() -> dict[str, Any]:
+    origin = _origin_from_base_url(settings.public_base_url)
+    connect_domains = [origin] if origin else []
+    resource_domains = [origin] if origin else []
+    return {
+        "openai/widgetCSP": {
+            "connect_domains": connect_domains,
+            "resource_domains": resource_domains,
+        },
+        "openai/widgetDescription": "Shows task lists, status updates, and integration results.",
+        "openai/widgetPrefersBorder": True,
+    }
 
 
 def create_app() -> FastAPI:
@@ -167,7 +200,9 @@ def create_app() -> FastAPI:
     <script>
       const root = document.getElementById("root");
       const output = window.openai?.toolOutput || {};
-      const tasks = output.data?.tasks || [];
+      const meta = window.openai?.toolResponseMetadata || {};
+      const payload = meta.ui?.payload || {};
+      const tasks = payload.tasks || [];
       const message = output.message || "Tasks";
 
       root.innerHTML = "";
@@ -212,6 +247,18 @@ def create_app() -> FastAPI:
   </body>
 </html>
 """.strip()
+
+    @mcp.list_resources()
+    async def list_resources() -> list[dict[str, Any]]:
+        return [
+            {
+                "uri": UI_TEMPLATE_URI,
+                "name": "Tasks widget",
+                "description": "Renders task lists, updates, and integration statuses.",
+                "mimeType": "text/html+skybridge",
+                "_meta": _widget_meta(),
+            }
+        ]
 
     @mcp.tool(
         name="create_task",
