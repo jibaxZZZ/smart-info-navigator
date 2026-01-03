@@ -5,11 +5,12 @@ Last updated: 2026-01-03
 ## Current State (PRD + Backlog)
 
 ### Epic 1 — ChatGPT App Foundation & Compliance
-- MCP server exists and exposes tools over MCP stdio (local dev). HTTPS public endpoint + manifest/health endpoints are not yet implemented.
-- Tool schemas are defined in `mcp-server/src/main.py` but UI metadata and ChatGPT UI rendering are not implemented.
+- MCP server now exposes a streamable HTTP MCP endpoint at `/mcp`, plus `/manifest.json` and `/health` via FastAPI (`mcp-server/src/http_app.py`, `mcp-server/src/http_main.py`).
+- Tool responses now include basic UI metadata and a Skybridge HTML template for task views.
+- Postman collection updated to test health, manifest, MCP initialize, tools list, create_task, and list_tasks (`mcp-server/postman/smart-info-navigator.postman_collection.json`).
 
 ### Epic 2 — Authentication & User Identity
-- Deferred. Current server uses a mock user ID in `mcp-server/src/main.py`.
+- Deferred. Current server uses a mock user ID in stdio and HTTP paths (`mcp-server/src/main.py`, `mcp-server/src/http_app.py`).
 
 ### Epic 3 — Core Workflow Tools (Business Logic Only)
 - Implemented: `create_task`, `list_tasks`, `update_task_status`, `trigger_integration` (email only).

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     debug: bool = False
     host: str = "0.0.0.0"
     port: int = 8000
+    public_base_url: str = "http://localhost:8000"
 
     # Database Configuration (PostgreSQL)
     # Using port 5433 to avoid conflict with local PostgreSQL on 5432

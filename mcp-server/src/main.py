@@ -7,6 +7,7 @@ NO AI/LLM calls are made from this server - only business operations.
 import asyncio
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
+from mcp.types import TextContent
 from .config import settings
 from .utils.logging import setup_logging, get_logger
 
