@@ -49,7 +49,7 @@ services:
     volumes:
       - ./mcp-server:/app
       - /app/.venv
-    command: uv run python -m src.main
+    command: uv run python -m src.http_main
     restart: unless-stopped
 
   ui:

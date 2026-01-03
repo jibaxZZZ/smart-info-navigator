@@ -1,0 +1,185 @@
+{
+  "info": {
+    "name": "Smart Info Navigator MCP",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Manifest",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/manifest.json",
+          "host": ["{{baseUrl}}"],
+          "path": ["manifest.json"]
+        }
+      }
+    },
+    {
+      "name": "MCP Initialize",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "mcp-protocol-version",
+            "value": "{{protocolVersion}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"{{protocolVersion}}\",\n    \"capabilities\": {},\n    \"clientInfo\": {\n      \"name\": \"postman\",\n      \"version\": \"1.0.0\"\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/mcp",
+          "host": ["{{baseUrl}}"],
+          "path": ["mcp"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.environment.set('mcpSessionId', pm.response.headers.get('mcp-session-id'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "MCP Tools List",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "mcp-protocol-version",
+            "value": "{{protocolVersion}}"
+          },
+          {
+            "key": "mcp-session-id",
+            "value": "{{mcpSessionId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/mcp",
+          "host": ["{{baseUrl}}"],
+          "path": ["mcp"]
+        }
+      }
+    },
+    {
+      "name": "MCP Create Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "mcp-protocol-version",
+            "value": "{{protocolVersion}}"
+          },
+          {
+            "key": "mcp-session-id",
+            "value": "{{mcpSessionId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"create_task\",\n    \"arguments\": {\n      \"title\": \"Postman Task\",\n      \"description\": \"Created from Postman collection\",\n      \"priority\": \"medium\",\n      \"due_date\": \"2026-02-01T18:00:00Z\"\n    }\n  }\n}\n"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/mcp",
+          "host": ["{{baseUrl}}"],
+          "path": ["mcp"]
+        }
+      }
+    },
+    {
+      "name": "MCP List Tasks",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "mcp-protocol-version",
+            "value": "{{protocolVersion}}"
+          },
+          {
+            "key": "mcp-session-id",
+            "value": "{{mcpSessionId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"list_tasks\",\n    \"arguments\": {\n      \"status\": \"pending\"\n    }\n  }\n}\n"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/mcp",
+          "host": ["{{baseUrl}}"],
+          "path": ["mcp"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "protocolVersion",
+      "value": "2024-11-05"
+    },
+    {
+      "key": "mcpSessionId",
+      "value": ""
+    }
+  ]
+}
