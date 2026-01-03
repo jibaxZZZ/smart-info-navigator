@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: workflow-orchestrator-postgres
+    environment:
+      POSTGRES_USER: workflow_user
+      POSTGRES_PASSWORD: workflow_password
+      POSTGRES_DB: workflow_orchestrator
+    ports:
+      - "5433:5432"  # Using 5433 to avoid conflict with local PostgreSQL on 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workflow_user -d workflow_orchestrator"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: workflow-orchestrator-redis
+    ports:
+      - "6380:6379"  # Using 6380 to avoid conflict with local Redis on 6379
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: ../docker/Dockerfile.mcp-server
+    container_name: workflow-orchestrator-mcp
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./mcp-server/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./mcp-server:/app
+      - /app/.venv
+    command: uv run python -m src.main
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: ../docker/Dockerfile.ui
+    container_name: smart-info-navigator-ui
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./ui/.env
+    depends_on:
+      - mcp-server
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+    command: npm run dev
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
