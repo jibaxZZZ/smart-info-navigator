@@ -24,3 +24,11 @@ Acceptance Criteria
 	•	Errors are human-readable
 	•	Empty states include next-step guidance
 	•	No raw stack traces exposed
+
+---
+
+Progress Notes (2026-01-03)
+- Storybook v10 configured for UI previews (`ui/`).
+- UI components added: TaskCard, TaskTable (sortable columns), StatusUpdate, EmailConfirmation, Checklist.
+- Light/dark theme variants demonstrated in Storybook stories.
+

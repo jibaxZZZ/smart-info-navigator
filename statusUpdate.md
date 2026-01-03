@@ -24,8 +24,10 @@ Last updated: 2026-01-03
 - Email (Gmail SMTP) implemented. Jira/Slack deferred.
 
 ### Epic 6 — UX & Interaction Design
-- UI metadata and confirmation/error/empty states not implemented.
-- Frontend is a placeholder Vite + React app with tabs.
+- Storybook v10 configured for UI previews (`ui/`).
+- UI components added: TaskCard, TaskTable (sortable columns), StatusUpdate, EmailConfirmation, Checklist.
+- Light/dark theme variants demonstrated in Storybook stories.
+- UI metadata wiring from MCP responses still pending.
 
 ### Epic 7 — Security, Reliability & Compliance
 - Structured logging implemented in `mcp-server/src/utils/logging.py`.
