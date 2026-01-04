@@ -44,12 +44,15 @@ class Settings(BaseSettings):
     cache_ttl: int = 3600  # 1 hour in seconds
 
     # OAuth Configuration
-    oauth_client_id: str
-    oauth_client_secret: str
-    jwt_secret: str
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60
-    refresh_token_expire_days: int = 7
+    oauth_enabled: bool = False  # Set to True to enable OAuth protection on MCP endpoints
+    oauth_issuer: str = "http://localhost:8000"  # Will be overridden by public_base_url in production
+    jwt_secret: str  # Required: Must be at least 32 characters for HS256
+    jwt_algorithm: str = "RS256"  # Use RS256 for production (asymmetric), HS256 for dev
+    jwt_private_key_path: Optional[str] = None  # Path to RSA private key for RS256
+    jwt_public_key_path: Optional[str] = None  # Path to RSA public key for RS256
+    access_token_expire_minutes: int = 60  # 1 hour as per ChatGPT Apps recommendation
+    refresh_token_expire_days: int = 30  # 30 days
+    authorization_code_expire_minutes: int = 10  # 10 minutes for auth codes
 
     # CORS Configuration
     allowed_origins: str = "https://chat.openai.com,https://chatgpt.com"

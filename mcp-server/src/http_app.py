@@ -17,6 +17,8 @@ from .config import settings
 from .tools.integrations import trigger_integration_tool
 from .tools.tasks import create_task_tool, list_tasks_tool, update_task_status_tool
 from .utils.logging import get_logger, setup_logging
+from .auth.oauth_routes import router as oauth_router
+from .auth.middleware import OAuthMiddleware
 
 setup_logging(
     log_level=settings.log_level,
@@ -97,6 +99,8 @@ def _widget_meta() -> dict[str, Any]:
 
 
 def create_app() -> FastAPI:
+    allow_all_origins = settings.debug
+    allowed_origins = ["*"] if allow_all_origins else settings.allowed_origins_list
     allowed_hosts: list[str] = []
     public_url = settings.public_base_url.strip()
     if public_url:
@@ -130,7 +134,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.allowed_origins_list,
+        allow_origins=allowed_origins,
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=[
             "mcp-protocol-version",
@@ -143,6 +147,8 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def validate_origin(request: Request, call_next):
+        if allow_all_origins:
+            return await call_next(request)
         origin = request.headers.get("origin")
         if origin and origin not in settings.allowed_origins_list:
             logger.warning(
@@ -151,6 +157,13 @@ def create_app() -> FastAPI:
             )
             return JSONResponse(status_code=403, content={"error": "Origin not allowed"})
         return await call_next(request)
+
+    # Add OAuth middleware to protect MCP endpoints (if enabled)
+    if settings.oauth_enabled:
+        logger.info("OAuth authentication is ENABLED for MCP endpoints")
+        app.middleware("http")(OAuthMiddleware(protected_paths=["/mcp"]))
+    else:
+        logger.warning("OAuth authentication is DISABLED - using mock user ID for all requests")
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:
@@ -248,17 +261,18 @@ def create_app() -> FastAPI:
 </html>
 """.strip()
 
-    @mcp.list_resources()
-    async def list_resources() -> list[dict[str, Any]]:
-        return [
-            {
-                "uri": UI_TEMPLATE_URI,
-                "name": "Tasks widget",
-                "description": "Renders task lists, updates, and integration statuses.",
-                "mimeType": "text/html+skybridge",
-                "_meta": _widget_meta(),
-            }
-        ]
+    # TODO: Fix FastMCP list_resources decorator issue
+    # @mcp.list_resources()
+    # async def list_resources() -> list[dict[str, Any]]:
+    #     return [
+    #         {
+    #             "uri": UI_TEMPLATE_URI,
+    #             "name": "Tasks widget",
+    #             "description": "Renders task lists, updates, and integration statuses.",
+    #             "mimeType": "text/html+skybridge",
+    #             "_meta": _widget_meta(),
+    #         }
+    #     ]
 
     @mcp.tool(
         name="create_task",
@@ -380,8 +394,8 @@ def create_app() -> FastAPI:
             "_meta": {"ui": {"view": "workflow_placeholder"}},
         }
 
+    # Include OAuth routes
+    app.include_router(oauth_router, tags=["oauth"])
+
     app.mount("/", mcp.streamable_http_app())
     return app
-
-
-app = create_app()

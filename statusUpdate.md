@@ -1,42 +1,86 @@
 # Status Update
 
-Last updated: 2026-01-03
+Last updated: 2026-01-04
 
 ## Current State (PRD + Backlog)
 
-### Epic 1 — ChatGPT App Foundation & Compliance
-- MCP server exposes a streamable HTTP MCP endpoint at `/mcp`, plus `/manifest.json` and `/health` via FastAPI (`mcp-server/src/http_app.py`, `mcp-server/src/http_main.py`).
-- UI resource registered with `text/html+skybridge` and widget metadata (CSP, description, border preference) to align with ChatGPT Apps UI requirements.
-- Tool metadata includes `openai/outputTemplate` and tool invocation messaging for widget rendering.
-- Tool responses now keep structuredContent concise and pass full UI payload via `_meta` for widgets.
-- Postman collection updated to test health, manifest, MCP initialize, tools list, create_task, and list_tasks (`mcp-server/postman/smart-info-navigator.postman_collection.json`).
+Overall progress: ~62%
 
-### Epic 2 — Authentication & User Identity
-- Deferred. Current server uses a mock user ID in stdio and HTTP paths (`mcp-server/src/main.py`, `mcp-server/src/http_app.py`).
+### Epic 1 — ChatGPT App Foundation & Compliance (70%)
+Done:
+- MCP server exposes `/mcp` (streamable HTTP), `/manifest.json`, `/health` via FastAPI.
+- UI resource registered with `text/html+skybridge` and widget metadata.
+- Tool responses include UI metadata for widgets; structured content kept compact.
 
-### Epic 3 — Core Workflow Tools (Business Logic Only)
-- Implemented: `create_task`, `list_tasks`, `update_task_status`, `trigger_integration` (email only).
-- Audit logging exists for task status updates.
-- List filters: status, priority, overdue. Pagination/sorting and UI metadata are not implemented.
+Remaining:
+- Public HTTPS deployment and verified DNS/hosting setup.
+- Formal tool schema validation against MCP spec.
+- Full UI rendering contract validation in ChatGPT (tables/buttons/badges).
 
-### Epic 4 — Reporting & Computation
-- Deferred. `generate_report` returns a Phase 2 placeholder.
+### Epic 2 — Authentication & User Identity (75%)
+Done:
+- OAuth 2.0 Authorization Code + PKCE flow implemented.
+- Dynamic client registration, token, revoke endpoints, middleware protection.
+- JWT signing with RS256 supported; Postman collection updated.
+- Token storage now uses hash-based lookup to avoid index bloat.
 
-### Epic 5 — External Integrations
-- Email (Gmail SMTP) implemented. Jira/Slack deferred.
+Remaining:
+- Replace mock user with real identity provider or login flow.
+- Consent screen and user authentication before `/authorize`.
+- JWKS endpoint for RS256 (still placeholder).
 
-### Epic 6 — UX & Interaction Design
-- Storybook v10 configured for UI previews (`ui/`).
-- UI components added: TaskCard, TaskTable (sortable columns), StatusUpdate, EmailConfirmation, Checklist.
-- Light/dark theme variants demonstrated in Storybook stories.
-- UI metadata wiring from MCP responses still pending.
+### Epic 3 — Core Workflow Tools (60%)
+Done:
+- `create_task`, `list_tasks`, `update_task_status` implemented.
+- Task audit logging and basic filters (status, priority, overdue).
+- Email integration via SMTP (Gmail).
 
-### Epic 7 — Security, Reliability & Compliance
-- Structured logging implemented in `mcp-server/src/utils/logging.py`.
-- Rate limiting and metrics not implemented.
+Remaining:
+- Idempotency guarantees for create/update.
+- Pagination/sorting for large task lists.
+- Stronger UI response schemas for task list and status updates.
 
-### Epic 8 — Submission & Launch Readiness
-- App metadata, privacy policy, and review checklist not implemented.
+### Epic 4 — Reporting & Computation (5%)
+Done:
+- Placeholders exist for reporting hooks.
+
+Remaining:
+- Implement `generate_report` (KPIs, time ranges).
+- Export endpoints (CSV/JSON).
+
+### Epic 5 — External Integrations (30%)
+Done:
+- Email integration implemented.
+
+Remaining:
+- Jira and Slack integrations.
+- Secure credential storage and retry/backoff.
+
+### Epic 6 — UX & Interaction Design (55%)
+Done:
+- Storybook configured; components built (TaskCard, TaskTable, StatusUpdate, EmailConfirmation, Checklist).
+- Light/dark variants in stories.
+
+Remaining:
+- Confirm/undo flows for destructive actions.
+- Error/empty states standardized for all views.
+- UI metadata wiring for all tool responses.
+
+### Epic 7 — Security, Reliability & Compliance (25%)
+Done:
+- Structured logging with request-scoped context.
+
+Remaining:
+- Rate limiting and abuse protection.
+- Metrics (Prometheus) and dashboards.
+
+### Epic 8 — Submission & Launch Readiness (10%)
+Done:
+- Core app metadata exists in manifest.
+
+Remaining:
+- App listing metadata, privacy policy, review checklist.
+- Documentation and audit for deterministic behavior.
 
 ## Key Artifacts
 - PRD: `prd-smart-info-navigator.md`
@@ -44,8 +88,15 @@ Last updated: 2026-01-03
 - Backend: `mcp-server/`
 - UI: `ui/`
 
+## Recent Changes
+- OAuth flow validated with RS256 keys and Postman collection.
+- OAuth token storage now uses hash-based lookup columns.
+- DB migrations updated for OAuth token storage.
+- Dev CORS loosened only when `DEBUG=true`.
+
 ## Next Steps (Suggested)
-1. Decide MCP transport and hosting (HTTPS + manifest + health endpoint).
-2. Implement real auth (Auth0/OIDC) and replace mock user.
-3. Add UI metadata to tool responses and build UI components.
-4. Implement reporting + exports.
+1. Implement JWKS endpoint and consent screen.
+2. Replace mock user with real identity flow.
+3. Add pagination/sorting and idempotency for tasks.
+4. Implement reports and exports.
+5. Add rate limiting + metrics.

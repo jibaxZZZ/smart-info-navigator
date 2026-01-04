@@ -1,17 +1,50 @@
 import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { mcpClient, Task } from './lib/mcp-client'
+import { TaskTable } from './components/Tasks/TaskTable'
+import { Button } from './components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'summary' | 'checklist' | 'export'>('summary')
+  const [activeTab, setActiveTab] = useState<'tasks' | 'workflows' | 'integrations'>('tasks')
+  const queryClient = useQueryClient()
+
+  // Fetch tasks using React Query
+  const { data: tasksResponse, isLoading, error } = useQuery({
+    queryKey: ['tasks'],
+    queryFn: () => mcpClient.listTasks(),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  })
+
+  // Update task status mutation
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ taskId, status }: { taskId: string; status: 'pending' | 'in_progress' | 'completed' }) =>
+      mcpClient.updateTaskStatus({ task_id: taskId, status }),
+    onSuccess: () => {
+      // Refetch tasks after successful update
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    },
+  })
+
+  const handleUpdateStatus = async (taskId: string, newStatus: 'pending' | 'in_progress' | 'completed') => {
+    try {
+      await updateTaskMutation.mutateAsync({ taskId, status: newStatus })
+    } catch (err) {
+      console.error('Failed to update task status:', err)
+    }
+  }
+
+  const tasks = tasksResponse?.data?.tasks || []
 
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">
-            Smart Info Navigator
+            Workflow Orchestrator
           </h1>
           <p className="text-muted-foreground mt-2">
-            Transform text into structured summaries and actionable checklists
+            Manage tasks, workflows, and integrations through natural language commands
           </p>
         </header>
 
@@ -19,53 +52,127 @@ function App() {
           <div className="border-b border-border mb-4">
             <nav className="flex gap-4">
               <button
-                onClick={() => setActiveTab('summary')}
+                onClick={() => setActiveTab('tasks')}
                 className={`px-4 py-2 border-b-2 transition-colors ${
-                  activeTab === 'summary'
+                  activeTab === 'tasks'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Summary
+                Tasks
               </button>
               <button
-                onClick={() => setActiveTab('checklist')}
+                onClick={() => setActiveTab('workflows')}
                 className={`px-4 py-2 border-b-2 transition-colors ${
-                  activeTab === 'checklist'
+                  activeTab === 'workflows'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Checklist
+                Workflows
               </button>
               <button
-                onClick={() => setActiveTab('export')}
+                onClick={() => setActiveTab('integrations')}
                 className={`px-4 py-2 border-b-2 transition-colors ${
-                  activeTab === 'export'
+                  activeTab === 'integrations'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Export
+                Integrations
               </button>
             </nav>
           </div>
 
           <div className="mt-6">
-            {activeTab === 'summary' && (
-              <div className="text-muted-foreground">
-                Summary view - Coming soon
+            {activeTab === 'tasks' && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-semibold">Your Tasks</h2>
+                  <Button variant="default">Create Task</Button>
+                </div>
+
+                {isLoading && (
+                  <div className="text-muted-foreground">Loading tasks...</div>
+                )}
+
+                {error && (
+                  <div className="text-destructive">
+                    Error loading tasks: {error instanceof Error ? error.message : 'Unknown error'}
+                  </div>
+                )}
+
+                {!isLoading && !error && (
+                  <TaskTable
+                    tasks={tasks}
+                    onUpdateStatus={handleUpdateStatus}
+                  />
+                )}
               </div>
             )}
-            {activeTab === 'checklist' && (
-              <div className="text-muted-foreground">
-                Checklist view - Coming soon
-              </div>
+
+            {activeTab === 'workflows' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Workflow Scheduling</CardTitle>
+                  <CardDescription>
+                    Automate task workflows and schedule recurring actions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    Workflow scheduling will be available in Phase 2
+                  </p>
+                </CardContent>
+              </Card>
             )}
-            {activeTab === 'export' && (
-              <div className="text-muted-foreground">
-                Export panel - Coming soon
-              </div>
+
+            {activeTab === 'integrations' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>External Integrations</CardTitle>
+                  <CardDescription>
+                    Connect with Jira, Email, Slack, and other services
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border rounded">
+                      <div>
+                        <h3 className="font-medium">Email (Gmail)</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Send task notifications via email
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        Configure
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between p-4 border rounded">
+                      <div>
+                        <h3 className="font-medium">Jira</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Sync tasks with Jira (Phase 2)
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" disabled>
+                        Coming Soon
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between p-4 border rounded">
+                      <div>
+                        <h3 className="font-medium">Slack</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Send updates to Slack (Phase 2)
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" disabled>
+                        Coming Soon
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         </main>

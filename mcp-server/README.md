@@ -1,114 +1,107 @@
 # Smart Info Navigator - MCP Server
 
-MCP (Model Context Protocol) server for Smart Info Navigator ChatGPT App.
+Python MCP server for the Smart Info Navigator ChatGPT App. Provides OAuth 2.0 authentication (PKCE), deterministic task tools, and a streamable HTTP MCP endpoint.
 
-## Setup
+## Tech Stack (versions from pyproject.toml)
+- Python >= 3.11
+- FastAPI >= 0.115
+- Uvicorn >= 0.32
+- SQLAlchemy (async) >= 2.0 + asyncpg >= 0.30
+- Alembic >= 1.13 (migrations)
+- PyJWT >= 2.10 (RS256/HS256)
+- Redis >= 5.2
+- pytest >= 9.0 + pytest-asyncio >= 0.24
 
-### Prerequisites
+## Entry Points
+- HTTP MCP server: `src/http_main.py` (FastAPI + FastMCP)
+- Stdio MCP server: `src/main.py`
 
-- Python 3.11+
-- UV package manager
-- Redis server
+## Local Setup
 
-### Installation
-
-1. Install dependencies:
 ```bash
+cd mcp-server
 uv sync
-```
-
-2. Copy environment configuration:
-```bash
 cp .env.example .env
 ```
 
-3. Edit `.env` and add your API keys and configuration.
+Edit `.env` and configure:
+- `DATABASE_URL` (Postgres)
+- `REDIS_URL`
+- `OAUTH_ENABLED`
+- `JWT_*` settings
 
-### Development
+## Run
 
-Run the MCP server:
+HTTP server:
+```bash
+uv run python -m src.http_main
+```
+
+Hot reload (dev):
+```bash
+uv run uvicorn src.http_main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Stdio MCP server:
 ```bash
 uv run python -m src.main
 ```
 
-Run tests:
+## Migrations
+
+Create a migration:
+```bash
+uv run alembic revision --autogenerate -m "describe change"
+```
+
+Apply migrations:
+```bash
+uv run alembic upgrade head
+```
+
+## OAuth 2.0 Flow (ChatGPT Apps)
+Endpoints:
+- `/.well-known/oauth-protected-resource`
+- `/authorize` (PKCE)
+- `/token` (authorization_code + refresh_token)
+- `/revoke`
+- `/register` (dynamic client registration)
+
+JWT signing:
+- RS256 in production (RSA keys via `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`)
+- HS256 allowed for local dev
+
+## MCP Tools
+- `create_task`
+- `list_tasks`
+- `update_task_status`
+- `trigger_integration` (email)
+
+## Postman
+OAuth flow collection:
+- `postman/oauth-flow.postman_collection.json`
+
+MCP tools collection:
+- `postman/smart-info-navigator.postman_collection.json`
+
+## Tests
+
 ```bash
 uv run pytest
 ```
 
-Type checking:
-```bash
-uv run mypy src/
-```
-
-Code formatting:
-```bash
-uv run black src/
-uv run ruff check src/
-```
-
-## MCP Tools
-
-### analyze_text
-Analyzes raw text and returns structured summary with sections.
-
-**Input:**
-- `text` (string): Raw text to analyze
-
-**Output:**
-- Summary object with title, sections, and metadata
-
-### generate_checklist
-Generates actionable checklist from text or summary.
-
-**Input:**
-- `source` (string): Source text or summary ID
-- `title` (string, optional): Checklist title
-
-**Output:**
-- Checklist object with items and priorities
-
-### update_checklist_item
-Updates checklist item completion status.
-
-**Input:**
-- `checklist_id` (string): Checklist identifier
-- `item_id` (string): Item identifier
-- `completed` (boolean): New completion status
-
-**Output:**
-- Updated checklist object
-
-### export_content
-Exports summary or checklist to PDF, Markdown, or CSV.
-
-**Input:**
-- `content_id` (string): Summary or checklist ID
-- `format` (string): Export format (pdf, markdown, csv)
-
-**Output:**
-- Download URL or base64-encoded file
-
-## Architecture
-
+## Project Layout
 ```
 src/
-├── main.py              # MCP server entry point
-├── config.py            # Configuration management
-├── auth/                # OAuth implementation
-├── tools/               # MCP tool implementations
-├── services/            # Business logic services
-├── models/              # Pydantic data models
-└── utils/               # Utility functions
+  auth/           OAuth + JWT + PKCE
+  tools/          MCP tool implementations
+  services/       Business logic
+  models/         SQLAlchemy + Pydantic models
+  utils/          Logging and helpers
+  http_app.py     FastAPI + FastMCP wiring
+  http_main.py    HTTP entrypoint
 ```
 
-## Environment Variables
-
-See `.env.example` for all configuration options.
-
-Key variables:
-- `OPENAI_API_KEY`: OpenAI API key for text analysis
-- `REDIS_URL`: Redis connection URL
-- `OAUTH_CLIENT_ID`: OAuth client ID
-- `OAUTH_CLIENT_SECRET`: OAuth client secret
-- `JWT_SECRET`: JWT signing secret
+## Notes
+- No LLM calls are made on the backend.
+- RSA key files are local-only and should not be committed.

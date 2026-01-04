@@ -66,6 +66,9 @@ async def init_db() -> None:
 
     This is useful for testing. In production, use Alembic migrations.
     """
+    # Ensure ORM models are imported so Base has all tables registered.
+    from ..models import database as _  # noqa: F401
+
     async with engine.begin() as conn:
         logger.info("Creating database tables")
         await conn.run_sync(Base.metadata.create_all)

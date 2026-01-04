@@ -16,10 +16,11 @@ Run these from `ui/`:
 - `npm run preview` — preview the production build locally.
 - `npm run lint` — run ESLint with zero warnings allowed.
 - `npm run type-check` — run TypeScript in no-emit mode.
+- `npm run storybook` — Storybook component preview.
 
 ## Coding Style & Naming Conventions
 - TypeScript + React functional components; prefer hooks and small, focused components.
-- Indentation uses 2 spaces; prefer single quotes in TS/TSX (match existing files).
+- Indentation uses 2 spaces; follow existing quoting style in each file.
 - Tailwind utility classes for styling; keep reusable class logic in `src/lib/` helpers.
 - Linting via ESLint; keep codebase lint-clean before PRs.
 
@@ -32,5 +33,5 @@ Run these from `ui/`:
 - PRs should include a short summary, test/lint results (or explicit skips), and screenshots for any UI changes.
 
 ## Security & Configuration Tips
-- Do not hard-code secrets. Use `.env` files and follow `.env.example` if present at repo root.
-- The UI expects a backend API; when needed, run the MCP server via the repo root tooling or `docker-compose`.
+- Do not hard-code secrets. Use `.env` files and follow `.env.example`.
+- The UI expects MCP endpoints under `VITE_MCP_BASE_URL`.

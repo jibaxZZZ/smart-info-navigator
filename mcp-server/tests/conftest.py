@@ -15,6 +15,9 @@ os.environ["LOG_FORMAT"] = "text"
 os.environ["LOG_OUTPUT"] = "stdout"
 os.environ.setdefault("SMTP_USER", "")
 os.environ.setdefault("SMTP_PASSWORD", "")
+os.environ["OAUTH_ENABLED"] = "false"
+os.environ["JWT_ALGORITHM"] = "HS256"
+os.environ["JWT_SECRET"] = "test-secret-for-jwt-signing-32chars"
 
 
 @pytest_asyncio.fixture(scope="session")

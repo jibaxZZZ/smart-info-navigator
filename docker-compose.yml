@@ -42,6 +42,8 @@ services:
     env_file:
       - ./mcp-server/.env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -51,6 +53,22 @@ services:
       - /app/.venv
     command: uv run python -m src.http_main
     restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./mcp-server
+      dockerfile: ../docker/Dockerfile.mcp-server
+    container_name: workflow-orchestrator-migrate
+    env_file:
+      - ./mcp-server/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./mcp-server:/app
+      - /app/.venv
+    command: uv run alembic upgrade head
+    restart: "no"
 
   ui:
     build:

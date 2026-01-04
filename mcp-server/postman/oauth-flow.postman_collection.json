@@ -1,0 +1,422 @@
+{
+  "info": {
+    "name": "Smart Info Navigator - OAuth 2.0 Flow",
+    "description": "OAuth 2.0 Authorization Code Flow with PKCE for ChatGPT Apps integration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "test_client_id",
+      "type": "string"
+    },
+    {
+      "key": "redirect_uri",
+      "value": "https://chatgpt.com/aip/g-test/oauth/callback",
+      "type": "string"
+    },
+    {
+      "key": "mcp_protocol_version",
+      "value": "2024-11-05",
+      "type": "string"
+    },
+    {
+      "key": "code_verifier",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "code_challenge",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "authorization_code",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. OAuth Metadata",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/.well-known/oauth-protected-resource",
+          "host": ["{{baseUrl}}"],
+          "path": [".well-known", "oauth-protected-resource"]
+        },
+        "description": "Get OAuth 2.0 server metadata (RFC 8414)"
+      }
+    },
+    {
+      "name": "2. Register OAuth Client",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const response = pm.response.json();",
+              "if (response.client_id) {",
+              "  pm.collectionVariables.set('client_id', response.client_id);",
+              "  console.log('Client ID:', response.client_id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_name\": \"Test ChatGPT App\",\n  \"redirect_uris\": [\"https://chatgpt.com/aip/g-test/oauth/callback\"],\n  \"grant_types\": [\"authorization_code\", \"refresh_token\"],\n  \"response_types\": [\"code\"],\n  \"scope\": \"tasks.read tasks.write offline_access\",\n  \"token_endpoint_auth_method\": \"none\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["register"]
+        },
+        "description": "Dynamic client registration (RFC 7591)"
+      }
+    },
+    {
+      "name": "3a. Generate PKCE Challenge (Pre-request)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Generate code_verifier (43-128 characters)",
+              "function base64UrlEncode(wordArray) {",
+              "  return CryptoJS.enc.Base64.stringify(wordArray)",
+              "    .replace(/\\+/g, '-')",
+              "    .replace(/\\//g, '_')",
+              "    .replace(/=+$/g, '');",
+              "}",
+              "",
+              "const code_verifier = base64UrlEncode(CryptoJS.lib.WordArray.random(32));",
+              "pm.collectionVariables.set('code_verifier', code_verifier);",
+              "",
+              "// Generate code_challenge (SHA-256 hash of code_verifier)",
+              "const code_challenge = base64UrlEncode(CryptoJS.SHA256(code_verifier));",
+              "pm.collectionVariables.set('code_challenge', code_challenge);",
+              "",
+              "console.log('Code Verifier:', code_verifier);",
+              "console.log('Code Challenge:', code_challenge);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        },
+        "description": "Run this request to generate PKCE code_verifier and code_challenge"
+      }
+    },
+    {
+      "name": "3b. Authorization Request",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const location = pm.response.headers.get('location');",
+              "if (location && location.includes('code=')) {",
+              "  const codeMatch = location.match(/code=([^&]+)/);",
+              "  if (codeMatch && codeMatch[1]) {",
+              "    pm.collectionVariables.set('authorization_code', codeMatch[1]);",
+              "    console.log('Authorization Code:', codeMatch[1]);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/authorize?response_type=code&client_id={{client_id}}&redirect_uri={{redirect_uri}}&scope=tasks.read tasks.write offline_access&state=random_state_123&code_challenge={{code_challenge}}&code_challenge_method=S256",
+          "host": ["{{baseUrl}}"],
+          "path": ["authorize"],
+          "query": [
+            {
+              "key": "response_type",
+              "value": "code"
+            },
+            {
+              "key": "client_id",
+              "value": "{{client_id}}"
+            },
+            {
+              "key": "redirect_uri",
+              "value": "{{redirect_uri}}"
+            },
+            {
+              "key": "scope",
+              "value": "tasks.read tasks.write offline_access"
+            },
+            {
+              "key": "state",
+              "value": "random_state_123"
+            },
+            {
+              "key": "code_challenge",
+              "value": "{{code_challenge}}"
+            },
+            {
+              "key": "code_challenge_method",
+              "value": "S256"
+            }
+          ]
+        },
+        "description": "Authorization endpoint - redirects to callback with authorization code. Copy the code from the redirect URL."
+      },
+      "protocolProfileBehavior": {
+        "followRedirects": false
+      }
+    },
+    {
+      "name": "4. Token Exchange (Authorization Code)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const response = pm.response.json();",
+              "if (response.access_token) {",
+              "  pm.collectionVariables.set('access_token', response.access_token);",
+              "  pm.collectionVariables.set('refresh_token', response.refresh_token);",
+              "  console.log('Access Token:', response.access_token.substring(0, 20) + '...');",
+              "  console.log('Refresh Token:', response.refresh_token ? response.refresh_token.substring(0, 20) + '...' : 'None');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "authorization_code"
+            },
+            {
+              "key": "code",
+              "value": "{{authorization_code}}",
+              "description": "Paste the authorization code from step 3"
+            },
+            {
+              "key": "redirect_uri",
+              "value": "{{redirect_uri}}"
+            },
+            {
+              "key": "client_id",
+              "value": "{{client_id}}"
+            },
+            {
+              "key": "code_verifier",
+              "value": "{{code_verifier}}"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/token",
+          "host": ["{{baseUrl}}"],
+          "path": ["token"]
+        },
+        "description": "Exchange authorization code for access and refresh tokens"
+      }
+    },
+    {
+      "name": "5. MCP Initialize",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "mcp-protocol-version",
+            "value": "{{mcp_protocol_version}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"{{mcp_protocol_version}}\",\n    \"capabilities\": {},\n    \"clientInfo\": {\"name\": \"postman\", \"version\": \"1.0.0\"}\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/mcp",
+          "host": ["{{baseUrl}}"],
+          "path": ["mcp"]
+        },
+        "description": "Initialize MCP session with OAuth access token"
+      }
+    },
+    {
+      "name": "6. Protected MCP Tool Call",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "mcp-protocol-version",
+            "value": "{{mcp_protocol_version}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"list_tasks\",\n    \"arguments\": {}\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/mcp",
+          "host": ["{{baseUrl}}"],
+          "path": ["mcp"]
+        },
+        "description": "Call MCP tool with OAuth access token (requires OAUTH_ENABLED=true in server config)"
+      }
+    },
+    {
+      "name": "7. Refresh Access Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const response = pm.response.json();",
+              "if (response.access_token) {",
+              "  pm.collectionVariables.set('access_token', response.access_token);",
+              "  console.log('New Access Token:', response.access_token.substring(0, 20) + '...');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "refresh_token"
+            },
+            {
+              "key": "refresh_token",
+              "value": "{{refresh_token}}"
+            },
+            {
+              "key": "client_id",
+              "value": "{{client_id}}"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/token",
+          "host": ["{{baseUrl}}"],
+          "path": ["token"]
+        },
+        "description": "Use refresh token to obtain a new access token"
+      }
+    },
+    {
+      "name": "8. Revoke Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "description": "Can be access_token or refresh_token"
+            },
+            {
+              "key": "token_type_hint",
+              "value": "access_token",
+              "description": "Optional hint about token type"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/revoke",
+          "host": ["{{baseUrl}}"],
+          "path": ["revoke"]
+        },
+        "description": "Revoke access or refresh token (RFC 7009)"
+      }
+    }
+  ]
+}

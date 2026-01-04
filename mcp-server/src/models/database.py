@@ -126,3 +126,112 @@ class TaskAuditLog(Base):
 
     def __repr__(self) -> str:
         return f"<TaskAuditLog(id={self.id}, task_id={self.task_id}, action={self.action})>"
+
+
+class OAuthClient(Base):
+    """OAuth client registration for ChatGPT Apps."""
+
+    __tablename__ = "oauth_clients"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    client_id = Column(String(255), unique=True, nullable=False, index=True)
+    client_name = Column(String(255), nullable=False)
+    client_uri = Column(String(500), nullable=True)
+    redirect_uris = Column(Text, nullable=False)  # JSON array of allowed redirect URIs
+    grant_types = Column(Text, nullable=False, default='["authorization_code", "refresh_token"]')
+    response_types = Column(Text, nullable=False, default='["code"]')
+    scope = Column(String(500), nullable=False, default="tasks.read tasks.write offline_access")
+    token_endpoint_auth_method = Column(String(50), nullable=False, default="none")  # "none" for PKCE public clients
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    # Relationships
+    authorization_codes = relationship("OAuthAuthorizationCode", back_populates="client", cascade="all, delete-orphan")
+    tokens = relationship("OAuthToken", back_populates="client", cascade="all, delete-orphan")
+
+    def __repr__(self) -> str:
+        return f"<OAuthClient(id={self.id}, client_id={self.client_id}, client_name={self.client_name})>"
+
+
+class OAuthAuthorizationCode(Base):
+    """OAuth authorization codes for PKCE flow."""
+
+    __tablename__ = "oauth_authorization_codes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    code = Column(String(255), unique=True, nullable=False, index=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("oauth_clients.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    redirect_uri = Column(String(500), nullable=False)
+    scope = Column(String(500), nullable=False)
+    code_challenge = Column(String(255), nullable=False)  # PKCE code challenge
+    code_challenge_method = Column(String(10), nullable=False, default="S256")  # S256 or plain
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    used = Column(String(10), nullable=False, default="false")  # "true" or "false" to track if code was exchanged
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    # Relationships
+    client = relationship("OAuthClient", back_populates="authorization_codes")
+    user = relationship("User")
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint("used IN ('true', 'false')", name="valid_used_flag"),
+        CheckConstraint("code_challenge_method IN ('S256', 'plain')", name="valid_code_challenge_method"),
+        Index("ix_auth_codes_expires_at", "expires_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<OAuthAuthorizationCode(id={self.id}, code={self.code[:10]}..., used={self.used})>"
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if authorization code is expired."""
+        return self.expires_at < utcnow()
+
+
+class OAuthToken(Base):
+    """OAuth access and refresh tokens."""
+
+    __tablename__ = "oauth_tokens"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    access_token = Column(Text, nullable=False)  # JWT can be long
+    refresh_token = Column(Text, nullable=True)
+    access_token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    refresh_token_hash = Column(String(64), unique=True, nullable=True, index=True)
+    token_type = Column(String(50), nullable=False, default="Bearer")
+    client_id = Column(UUID(as_uuid=True), ForeignKey("oauth_clients.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    scope = Column(String(500), nullable=False)
+    access_token_expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    refresh_token_expires_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    revoked = Column(String(10), nullable=False, default="false")  # "true" or "false"
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    # Relationships
+    client = relationship("OAuthClient", back_populates="tokens")
+    user = relationship("User")
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint("revoked IN ('true', 'false')", name="valid_revoked_flag"),
+        Index("ix_tokens_access_expires", "access_token_expires_at"),
+        Index("ix_tokens_refresh_expires", "refresh_token_expires_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<OAuthToken(id={self.id}, token_type={self.token_type}, revoked={self.revoked})>"
+
+    @property
+    def is_access_token_expired(self) -> bool:
+        """Check if access token is expired."""
+        return self.access_token_expires_at < utcnow()
+
+    @property
+    def is_refresh_token_expired(self) -> bool:
+        """Check if refresh token is expired."""
+        if not self.refresh_token_expires_at:
+            return True
+        return self.refresh_token_expires_at < utcnow()
