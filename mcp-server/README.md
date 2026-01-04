@@ -68,6 +68,10 @@ Endpoints:
 - `/revoke`
 - `/register` (dynamic client registration)
 
+Demo login (App review):
+- `DEMO_USERNAME` / `DEMO_PASSWORD` in `.env`
+- OAuth `/authorize` shows a login page when demo credentials are enabled.
+
 JWT signing:
 - RS256 in production (RSA keys via `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`)
 - HS256 allowed for local dev
@@ -77,6 +81,10 @@ JWT signing:
 - `list_tasks`
 - `update_task_status`
 - `trigger_integration` (email)
+
+## Widget UI (ChatGPT Apps)
+- Widgets are served via `ui://...` resources with `text/html+skybridge`.
+- Each widget resource must include `openai/widgetCSP` and `openai/widgetDomain`.
 
 ## Postman
 OAuth flow collection:

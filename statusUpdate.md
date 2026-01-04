@@ -94,6 +94,14 @@ Remaining:
 - DB migrations updated for OAuth token storage.
 - Dev CORS loosened only when `DEBUG=true`.
 - OAuth metadata aligned with ChatGPT Apps: protected-resource + authorization-server endpoints.
+- OAuth bearer responses now include `resource_metadata` for Apps discovery.
+- Added demo login gate for app review (username/password) with session cookie.
+- Added OpenAI Apps domain verification endpoint (`/.well-known/openai-apps-challenge`).
+- Tool annotations (readOnly/openWorld/destructive) set on MCP tools.
+- Widget metadata now includes `openai/widgetCSP` and `openai/widgetDomain`.
+- Tool responses now return structured content + UI metadata via `CallToolResult`.
+- Tools now read OAuth user_id from request context instead of mock user.
+- DNS rebinding allowlist now supports extra hosts via `ALLOWED_HOSTS`.
 
 ## Next Steps (Suggested)
 1. Implement JWKS endpoint and consent screen.
