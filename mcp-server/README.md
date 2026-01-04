@@ -61,7 +61,8 @@ uv run alembic upgrade head
 
 ## OAuth 2.0 Flow (ChatGPT Apps)
 Endpoints:
-- `/.well-known/oauth-protected-resource`
+- `/.well-known/oauth-protected-resource` (protected resource metadata)
+- `/.well-known/oauth-authorization-server` (authorization server metadata)
 - `/authorize` (PKCE)
 - `/token` (authorization_code + refresh_token)
 - `/revoke`

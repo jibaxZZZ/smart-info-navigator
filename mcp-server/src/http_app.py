@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import contextlib
+import base64
+import json
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.types import Resource as MCPResource
+import mcp.types as mcp_types
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .config import settings
@@ -44,13 +49,21 @@ def _tool_meta(template_uri: str, invoking: str, invoked: str) -> dict[str, Any]
     }
 
 
-def _tool_response(result: dict[str, Any], view: str) -> dict[str, Any]:
+def _tool_annotations(read_only: bool, open_world: bool, destructive: bool) -> ToolAnnotations:
+    return ToolAnnotations(
+        readOnlyHint=read_only,
+        openWorldHint=open_world,
+        destructiveHint=destructive,
+    )
+
+def _tool_response(result: dict[str, Any], view: str) -> CallToolResult:
     message = result.get("message") or result.get("error") or "Request completed."
     data = result.get("data") or {}
     structured_content: dict[str, Any] = {
         "success": result.get("success", False),
         "message": message,
         "view": view,
+        "payload": data,
     }
 
     if "count" in data and isinstance(data["count"], int):
@@ -62,14 +75,16 @@ def _tool_response(result: dict[str, Any], view: str) -> dict[str, Any]:
     if not structured_content["success"] and "error" in result:
         structured_content["error"] = result["error"]
 
-    return {
-        "structuredContent": structured_content,
-        "content": [{"type": "text", "text": message}],
-        "_meta": {
-            "ui": {"view": view, "payload": data},
-            "raw": result,
-        },
-    }
+    return CallToolResult(
+        structuredContent=structured_content,
+        content=[
+            TextContent(
+                type="text",
+                text=message,
+                meta={"ui": {"view": view, "payload": data}, "raw": result},
+            )
+        ],
+    )
 
 
 UI_TEMPLATE_URI = "ui://widget/tasks.html"
@@ -84,18 +99,72 @@ def _origin_from_base_url(base_url: str) -> str | None:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+def _user_id_from_context(ctx: Context | None) -> str:
+    if not ctx:
+        return MOCK_USER_ID
+    request = getattr(ctx.request_context, "request", None)
+    if request and hasattr(request, "state"):
+        user_id = getattr(request.state, "user_id", None)
+        if user_id:
+            return str(user_id)
+    return MOCK_USER_ID
+
+
 def _widget_meta() -> dict[str, Any]:
     origin = _origin_from_base_url(settings.public_base_url)
     connect_domains = [origin] if origin else []
-    resource_domains = [origin] if origin else []
+    resource_domains = ["https://persistent.oaistatic.com"]
     return {
         "openai/widgetCSP": {
             "connect_domains": connect_domains,
             "resource_domains": resource_domains,
         },
+        "openai/widgetDomain": "https://chatgpt.com",
         "openai/widgetDescription": "Shows task lists, status updates, and integration results.",
         "openai/widgetPrefersBorder": True,
     }
+
+
+class WidgetFastMCP(FastMCP):
+    async def list_resources(self) -> list[MCPResource]:
+        resources = await super().list_resources()
+        widget_meta = _widget_meta()
+        updated: list[MCPResource] = []
+        for resource in resources:
+            if str(resource.uri) == UI_TEMPLATE_URI:
+                updated.append(resource.model_copy(update={"meta": widget_meta}))
+            else:
+                updated.append(resource)
+        return updated
+
+
+def _register_widget_read_resource_handler(mcp: WidgetFastMCP) -> None:
+    async def handler(req: mcp_types.ReadResourceRequest):
+        context = mcp.get_context()
+        resource = await mcp._resource_manager.get_resource(req.params.uri, context=context)
+        content = await resource.read()
+        meta = _widget_meta() if str(resource.uri) == UI_TEMPLATE_URI else None
+
+        if isinstance(content, bytes):  # pragma: no cover
+            blob = mcp_types.BlobResourceContents(
+                uri=req.params.uri,
+                blob=base64.b64encode(content).decode(),
+                mimeType=resource.mime_type,
+                meta=meta,
+            )
+            return mcp_types.ServerResult(mcp_types.ReadResourceResult(contents=[blob]))
+        if not isinstance(content, str):
+            content = json.dumps(content, default=str)
+
+        text = mcp_types.TextResourceContents(
+            uri=req.params.uri,
+            text=content,
+            mimeType=resource.mime_type,
+            meta=meta,
+        )
+        return mcp_types.ServerResult(mcp_types.ReadResourceResult(contents=[text]))
+
+    mcp._mcp_server.request_handlers[mcp_types.ReadResourceRequest] = handler
 
 
 def create_app() -> FastAPI:
@@ -110,10 +179,11 @@ def create_app() -> FastAPI:
                 allowed_hosts.append(f"{parsed.hostname}:{parsed.port}")
             else:
                 allowed_hosts.append(parsed.hostname)
+    allowed_hosts.extend(settings.allowed_hosts_list)
     if settings.debug:
         allowed_hosts.extend(["localhost:*", "127.0.0.1:*", "[::1]:*"])
 
-    mcp = FastMCP(
+    mcp = WidgetFastMCP(
         settings.app_name,
         json_response=True,
         stateless_http=True,
@@ -124,6 +194,7 @@ def create_app() -> FastAPI:
             allowed_origins=settings.allowed_origins_list,
         ),
     )
+    _register_widget_read_resource_handler(mcp)
 
     @contextlib.asynccontextmanager
     async def _lifespan(_: FastAPI):
@@ -148,6 +219,9 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def validate_origin(request: Request, call_next):
         if allow_all_origins:
+            return await call_next(request)
+        path = request.url.path
+        if path.startswith(("/login", "/authorize", "/.well-known/")):
             return await call_next(request)
         origin = request.headers.get("origin")
         if origin and origin not in settings.allowed_origins_list:
@@ -191,6 +265,14 @@ def create_app() -> FastAPI:
             ],
         }
 
+    @app.get(settings.openai_apps_verification_path)
+    async def openai_domain_verification() -> Response:
+        logger.info("OpenAI domain verification requested with token: %s", settings.openai_apps_verification_token)
+        token = (settings.openai_apps_verification_token or "").strip()
+        if not token:
+            return Response(status_code=404)
+        return Response(content=token, media_type="text/plain")
+
     @mcp.resource(UI_TEMPLATE_URI, mime_type="text/html+skybridge")
     def tasks_widget() -> str:
         return """
@@ -212,11 +294,36 @@ def create_app() -> FastAPI:
     <div id=\"root\"></div>
     <script>
       const root = document.getElementById("root");
-      const output = window.openai?.toolOutput || {};
       const meta = window.openai?.toolResponseMetadata || {};
-      const payload = meta.ui?.payload || {};
-      const tasks = payload.tasks || [];
-      const message = output.message || "Tasks";
+      let output = window.openai?.toolOutput || {};
+
+      const tryParse = (value) => {
+        if (typeof value !== "string") return value;
+        try {
+          return JSON.parse(value);
+        } catch (err) {
+          return value;
+        }
+      };
+
+      output = tryParse(output);
+      output.result = tryParse(output.result);
+
+      const payload =
+        output.payload ||
+        output.data ||
+        output.result?.payload ||
+        output.result?.data ||
+        meta.ui?.payload ||
+        {};
+
+      const tasks =
+        payload.tasks ||
+        output.tasks ||
+        output.result?.tasks ||
+        [];
+
+      const message = output.message || payload.message || "Tasks";
 
       root.innerHTML = "";
       const summary = document.createElement("div");
@@ -278,13 +385,16 @@ def create_app() -> FastAPI:
         name="create_task",
         title="Create Task",
         meta=_tool_meta(UI_TEMPLATE_URI, "Creating task…", "Task created."),
+        annotations=_tool_annotations(read_only=False, open_world=False, destructive=False),
     )
     async def create_task(
         title: str,
         description: str | None = None,
         due_date: str | None = None,
         priority: Literal["low", "medium", "high"] = "medium",
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        user_id = _user_id_from_context(ctx)
         result = await create_task_tool(
             {
                 "title": title,
@@ -292,7 +402,7 @@ def create_app() -> FastAPI:
                 "due_date": due_date,
                 "priority": priority,
             },
-            MOCK_USER_ID,
+            user_id,
         )
         return _tool_response(result, "task_card")
 
@@ -300,15 +410,18 @@ def create_app() -> FastAPI:
         name="list_tasks",
         title="List Tasks",
         meta=_tool_meta(UI_TEMPLATE_URI, "Fetching tasks…", "Tasks ready."),
+        annotations=_tool_annotations(read_only=True, open_world=False, destructive=False),
     )
     async def list_tasks(
         status: Literal["pending", "in_progress", "completed"] | None = None,
         priority: Literal["low", "medium", "high"] | None = None,
         overdue: bool | None = None,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        user_id = _user_id_from_context(ctx)
         result = await list_tasks_tool(
             {"status": status, "priority": priority, "overdue": overdue},
-            MOCK_USER_ID,
+            user_id,
         )
         return _tool_response(result, "task_table")
 
@@ -316,14 +429,17 @@ def create_app() -> FastAPI:
         name="update_task_status",
         title="Update Task Status",
         meta=_tool_meta(UI_TEMPLATE_URI, "Updating task…", "Task updated."),
+        annotations=_tool_annotations(read_only=False, open_world=False, destructive=False),
     )
     async def update_task_status(
         task_id: str,
         status: Literal["pending", "in_progress", "completed"],
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        user_id = _user_id_from_context(ctx)
         result = await update_task_status_tool(
             {"task_id": task_id, "status": status},
-            MOCK_USER_ID,
+            user_id,
         )
         return _tool_response(result, "task_card")
 
@@ -331,19 +447,22 @@ def create_app() -> FastAPI:
         name="trigger_integration",
         title="Trigger Integration",
         meta=_tool_meta(UI_TEMPLATE_URI, "Triggering integration…", "Integration triggered."),
+        annotations=_tool_annotations(read_only=False, open_world=True, destructive=False),
     )
     async def trigger_integration(
         integration_type: Literal["jira", "email", "slack"],
         action: str,
         data: dict[str, Any] | None = None,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        user_id = _user_id_from_context(ctx)
         result = await trigger_integration_tool(
             {
                 "integration_type": integration_type,
                 "action": action,
                 "data": data or {},
             },
-            MOCK_USER_ID,
+            user_id,
         )
         return _tool_response(result, "integration_status")
 
@@ -351,10 +470,12 @@ def create_app() -> FastAPI:
         name="generate_report",
         title="Generate Report",
         meta=_tool_meta(UI_TEMPLATE_URI, "Generating report…", "Report ready."),
+        annotations=_tool_annotations(read_only=True, open_world=False, destructive=False),
     )
     async def generate_report(
         report_type: Literal["weekly", "monthly", "productivity"],
         format: Literal["json", "pdf", "csv"] | None = None,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
         return {
             "structuredContent": {
@@ -374,11 +495,13 @@ def create_app() -> FastAPI:
         name="schedule_workflow",
         title="Schedule Workflow",
         meta=_tool_meta(UI_TEMPLATE_URI, "Scheduling workflow…", "Workflow scheduled."),
+        annotations=_tool_annotations(read_only=False, open_world=False, destructive=False),
     )
     async def schedule_workflow(
         workflow_name: str,
         schedule: str | None = None,
         actions: list[dict[str, Any]] | None = None,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
         return {
             "structuredContent": {

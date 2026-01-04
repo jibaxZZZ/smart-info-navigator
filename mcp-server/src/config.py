@@ -56,6 +56,16 @@ class Settings(BaseSettings):
 
     # CORS Configuration
     allowed_origins: str = "https://chat.openai.com,https://chatgpt.com"
+    allowed_hosts: str = ""  # Comma-separated extra hosts for DNS rebinding protection
+
+    # OpenAI Apps domain verification
+    openai_apps_verification_token: Optional[str] = None
+    openai_apps_verification_path: str = "/.well-known/openai-apps-challenge"
+
+    # Demo login for App review
+    demo_username: Optional[str] = None
+    demo_password: Optional[str] = None
+    demo_session_ttl_minutes: int = 60
 
     # Rate Limiting
     rate_limit_per_minute: int = 100
@@ -77,6 +87,13 @@ class Settings(BaseSettings):
     def allowed_origins_list(self) -> list[str]:
         """Parse allowed origins from comma-separated string."""
         return [origin.strip() for origin in self.allowed_origins.split(",")]
+
+    @property
+    def allowed_hosts_list(self) -> list[str]:
+        """Parse allowed hosts from comma-separated string."""
+        if not self.allowed_hosts:
+            return []
+        return [host.strip() for host in self.allowed_hosts.split(",")]
 
 
 # Global settings instance

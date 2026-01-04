@@ -35,6 +35,11 @@ async def list_tools():
         {
             "name": "create_task",
             "description": "Create a new task in the system",
+            "annotations": {
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -49,6 +54,11 @@ async def list_tools():
         {
             "name": "list_tasks",
             "description": "List tasks with optional filters",
+            "annotations": {
+                "readOnlyHint": True,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -61,6 +71,11 @@ async def list_tools():
         {
             "name": "update_task_status",
             "description": "Update the status of a task",
+            "annotations": {
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -73,6 +88,11 @@ async def list_tools():
         {
             "name": "generate_report",
             "description": "Generate a business report from task data",
+            "annotations": {
+                "readOnlyHint": True,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -85,6 +105,11 @@ async def list_tools():
         {
             "name": "trigger_integration",
             "description": "Trigger an action in external systems (Jira, CRM, etc.)",
+            "annotations": {
+                "readOnlyHint": False,
+                "openWorldHint": True,
+                "destructiveHint": False,
+            },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -98,6 +123,11 @@ async def list_tools():
         {
             "name": "schedule_workflow",
             "description": "Schedule a workflow to execute later or on trigger",
+            "annotations": {
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
             "inputSchema": {
                 "type": "object",
                 "properties": {

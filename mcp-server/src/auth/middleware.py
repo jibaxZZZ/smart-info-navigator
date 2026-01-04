@@ -1,12 +1,13 @@
 """OAuth middleware for protecting MCP endpoints."""
 
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from typing import Optional, Callable
 import jwt
 
 from ..database import AsyncSessionLocal
+from ..config import settings
 from ..models.database import OAuthToken
 from ..auth import verify_token
 from .token_utils import hash_token
@@ -106,6 +107,7 @@ class OAuthMiddleware:
             "/manifest.json",
             "/.well-known/",
             "/authorize",
+            "/login",
             "/token",
             "/revoke",
             "/register",
@@ -152,10 +154,24 @@ class OAuthMiddleware:
 
         Follows RFC 6750 (The OAuth 2.0 Authorization Framework: Bearer Token Usage).
         """
+        resource_metadata = None
+        if settings.public_base_url:
+            base_url = settings.public_base_url.rstrip("/")
+            resource_metadata = f'{base_url}/.well-known/oauth-protected-resource'
+
+        auth_params = [
+            'realm="MCP"',
+            f'error="{error}"',
+            f'error_description="{description}"',
+        ]
+        if resource_metadata:
+            auth_params.append(f'resource_metadata="{resource_metadata}"')
+        auth_params.append('scope="tasks.read tasks.write offline_access"')
+
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"error": error, "error_description": description},
             headers={
-                "WWW-Authenticate": f'Bearer realm="MCP", error="{error}", error_description="{description}"'
+                "WWW-Authenticate": "Bearer " + ", ".join(auth_params)
             },
         )

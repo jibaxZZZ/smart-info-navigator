@@ -5,6 +5,15 @@ from typing import Optional, List
 from datetime import datetime
 
 
+class OAuthProtectedResourceMetadataResponse(BaseModel):
+    """OAuth 2.0 Protected Resource Metadata (RFC 9728)."""
+
+    resource: str
+    authorization_servers: List[str]
+    scopes_supported: Optional[List[str]] = None
+    resource_documentation: Optional[str] = None
+
+
 class OAuthMetadataResponse(BaseModel):
     """OAuth 2.0 Authorization Server Metadata (RFC 8414)."""
 

@@ -93,6 +93,7 @@ Remaining:
 - OAuth token storage now uses hash-based lookup columns.
 - DB migrations updated for OAuth token storage.
 - Dev CORS loosened only when `DEBUG=true`.
+- OAuth metadata aligned with ChatGPT Apps: protected-resource + authorization-server endpoints.
 
 ## Next Steps (Suggested)
 1. Implement JWKS endpoint and consent screen.
